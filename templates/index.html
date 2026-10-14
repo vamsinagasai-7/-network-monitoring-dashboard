@@ -1,0 +1,352 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>NETWATCH | LAN Monitor</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css', v='5') }}">
+</head>
+
+<body>
+
+<header class="topbar">
+    <a href="/" class="brand">
+        <span class="brand-logo">N</span>
+
+        <span>
+            <strong>NETWATCH</strong>
+            <small>LAN Network Monitoring</small>
+        </span>
+    </a>
+
+    <div class="live-indicator">
+        <span class="live-dot"></span>
+        MONITORING
+    </div>
+</header>
+
+<main class="page">
+
+    <section class="page-heading">
+        <div class="heading-copy">
+            <p class="eyebrow">NETWORK OPERATIONS</p>
+
+            <h1>Network Overview</h1>
+
+            <p class="subtitle">
+                Monitor devices connected to your local network.
+            </p>
+        </div>
+
+        <button type="button"
+                id="refreshButton"
+                class="scan-button">
+
+            <span class="refresh-icon">↻</span>
+            <span id="scanText">Scan Network</span>
+        </button>
+    </section>
+
+    <p id="message" class="message"
+       role="status" aria-live="polite">
+        {% if scan_error %}
+            Scan failed: {{ scan_error }}
+        {% endif %}
+    </p>
+
+    <section class="stats-grid">
+
+        <article class="stat-card">
+            <div class="stat-heading">
+                <span>DISCOVERED DEVICES</span>
+                <span class="stat-icon blue">⌘</span>
+            </div>
+
+            <strong class="stat-number">{{ total_devices }}</strong>
+            <p>Detected on your LAN</p>
+        </article>
+
+        <article class="stat-card">
+            <div class="stat-heading">
+                <span>ONLINE</span>
+                <span class="stat-icon green">✓</span>
+            </div>
+
+            <strong class="stat-number">{{ online_devices }}</strong>
+            <p>Responding to ping</p>
+        </article>
+
+        <article class="stat-card">
+            <div class="stat-heading">
+                <span>NO PING REPLY</span>
+                <span class="stat-icon amber">!</span>
+            </div>
+
+            <strong class="stat-number">{{ offline_devices }}</strong>
+            <p>Detected but not responding</p>
+        </article>
+
+        <article class="stat-card">
+            <div class="stat-heading">
+                <span>PING RESPONSE RATIO</span>
+                <span class="stat-icon violet">%</span>
+            </div>
+
+            <strong class="stat-number">
+                {% if total_devices > 0 %}
+                    {{ ((online_devices / total_devices) * 100) | round(1) }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </strong>
+
+            <p>Online / discovered</p>
+        </article>
+
+    </section>
+
+    <section class="device-panel">
+
+        <div class="panel-heading">
+            <div>
+                <h2>Discovered Devices</h2>
+                <p>Select a device to view its details.</p>
+            </div>
+
+            <span class="total-pill">
+                {{ total_devices }} devices
+            </span>
+        </div>
+
+        <div class="toolbar">
+
+            <label class="search-box">
+                <span aria-hidden="true">⌕</span>
+
+                <input
+                    id="deviceSearch"
+                    type="search"
+                    placeholder="Search name, IP, MAC or vendor..."
+                    autocomplete="off"
+                >
+            </label>
+
+            <div class="filters" aria-label="Device filters">
+                <button type="button"
+                        class="filter active"
+                        data-filter="all">
+                    All
+                </button>
+
+                <button type="button"
+                        class="filter"
+                        data-filter="online">
+                    Online
+                </button>
+
+                <button type="button"
+                        class="filter"
+                        data-filter="no-reply">
+                    No ping reply
+                </button>
+            </div>
+
+        </div>
+
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>DEVICE</th>
+                        <th>IP ADDRESS</th>
+                        <th>MAC ADDRESS</th>
+                        <th>VENDOR</th>
+                        <th>STATUS</th>
+                        <th>LATENCY</th>
+                    </tr>
+                </thead>
+
+                <tbody id="deviceRows">
+                    {% for device in devices %}
+
+                    <tr class="device-row"
+                        tabindex="0"
+                        data-name="{{ device.name }}"
+                        data-ip="{{ device.ip }}"
+                        data-mac="{{ device.mac }}"
+                        data-vendor="{{ device.vendor }}"
+                        data-status="{{ device.status }}"
+                        data-latency="{{ device.latency }}"
+                        data-search="{{ device.name }} {{ device.ip }} {{ device.mac }} {{ device.vendor }}"
+                        aria-label="View details for {{ device.name }}">
+
+                        <td>
+                            <div class="device-cell">
+
+                                <span class="device-avatar">
+                                    {% if device.status == "Online" %}
+                                        ✓
+                                    {% else %}
+                                        ⌘
+                                    {% endif %}
+                                </span>
+
+                                <span class="device-name">
+                                    <strong>{{ device.name }}</strong>
+                                    <small>LAN device</small>
+                                </span>
+
+                            </div>
+                        </td>
+
+                        <td>
+                            <span class="mono ip">{{ device.ip }}</span>
+                        </td>
+
+                        <td>
+                            <span class="mono">
+                                {{ device.mac or "Unknown" }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ device.vendor or "Unknown" }}
+                        </td>
+
+                        <td>
+                            {% if device.status == "Online" %}
+
+                                <span class="status online">
+                                    <i></i> Online
+                                </span>
+
+                            {% elif device.status == "ARP Detected" %}
+
+                                <span class="status arp">
+                                    <i></i> ARP detected
+                                </span>
+
+                            {% else %}
+
+                                <span class="status offline">
+                                    <i></i> {{ device.status }}
+                                </span>
+
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if device.status == "Online" %}
+                                <span class="mono latency">
+                                    {{ device.latency }}
+                                </span>
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div id="noResults" class="empty-state" hidden>
+                <h3>No devices found</h3>
+                <p>Try another search or filter.</p>
+            </div>
+        </div>
+
+        <div class="table-footer">
+            <span id="visibleCount">
+                Showing {{ total_devices }} devices
+            </span>
+
+            <span>NETWATCH · LAN Monitor</span>
+        </div>
+
+    </section>
+
+    <footer class="page-footer">
+        Results are from the latest scan.
+        Devices may block ping or hostname discovery.
+    </footer>
+
+</main>
+
+<!-- DEVICE DETAILS POPUP -->
+<div id="deviceModal" class="modal" aria-hidden="true">
+
+    <section class="modal-card"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="modalName">
+
+        <div class="modal-heading">
+            <div>
+                <p class="eyebrow">DEVICE INFORMATION</p>
+                <h2 id="modalName">Device Details</h2>
+            </div>
+
+            <button type="button"
+                    id="modalClose"
+                    class="close-button"
+                    aria-label="Close popup">
+                ×
+            </button>
+        </div>
+
+        <div class="modal-status">
+            <span id="modalStatus" class="status arp">Unknown</span>
+        </div>
+
+        <div class="detail-grid">
+
+            <div class="detail-box">
+                <span>IP ADDRESS</span>
+                <strong id="modalIP">—</strong>
+            </div>
+
+            <div class="detail-box">
+                <span>MAC ADDRESS</span>
+                <strong id="modalMAC">—</strong>
+            </div>
+
+            <div class="detail-box">
+                <span>HOSTNAME</span>
+                <strong id="modalHostname">—</strong>
+            </div>
+
+            <div class="detail-box">
+                <span>VENDOR</span>
+                <strong id="modalVendor">—</strong>
+            </div>
+
+            <div class="detail-box">
+                <span>LATENCY</span>
+                <strong id="modalLatency">—</strong>
+            </div>
+
+            <div class="detail-box">
+                <span>CONNECTIVITY CHECK</span>
+                <strong id="modalMethod">—</strong>
+            </div>
+
+        </div>
+
+        <p class="modal-footer">
+            Information from the latest scan.
+        </p>
+
+    </section>
+</div>
+
+<script src="{{ url_for('static', filename='script.js', v='5') }}"
+        defer></script>
+
+</body>
+</html>
